@@ -1,0 +1,337 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model alumnos {
+  id                  Int              @id @default(autoincrement())
+  matricula           String           @unique(map: "matricula") @db.VarChar(20)
+  nombre              String           @db.VarChar(100)
+  apellido_paterno    String           @db.VarChar(50)
+  apellido_materno    String?          @db.VarChar(50)
+  fecha_nacimiento    DateTime?        @db.Date
+  genero              alumnos_genero?
+  telefono            String?          @db.VarChar(15)
+  email               String?          @db.VarChar(100)
+  direccion           String?          @db.Text
+  ciudad              String?          @db.VarChar(50)
+  estado              String?          @db.VarChar(50)
+  codigo_postal       String?          @db.VarChar(10)
+  contacto_emergencia String?          @db.VarChar(100)
+  telefono_emergencia String?          @db.VarChar(15)
+  relacion_emergencia String?          @db.VarChar(50)
+  fecha_inscripcion   DateTime         @db.Date
+  fecha_inicio        DateTime         @db.Date
+  plan_id             Int
+  fecha_vigencia      DateTime         @db.Date
+  fecha_extension     DateTime?        @db.Date
+  estatus             alumnos_estatus? @default(activo)
+  motivo_baja         String?          @db.Text
+  notas               String?          @db.Text
+  foto_url            String?          @db.VarChar(500)
+  documentos_url      String?          @db.LongText
+  fecha_creacion      DateTime?        @default(now()) @db.Timestamp(0)
+  fecha_actualizacion DateTime?        @default(now()) @db.Timestamp(0)
+  planes              planes           @relation(fields: [plan_id], references: [id], onUpdate: Restrict, map: "alumnos_ibfk_1")
+  mensualidades       mensualidades[]
+  notificaciones      notificaciones[]
+  pagos               pagos[]
+
+  @@index([estatus], map: "idx_alumnos_estatus")
+  @@index([fecha_inscripcion], map: "idx_alumnos_fecha_inscripcion")
+  @@index([email], map: "idx_alumnos_email")
+  @@index([fecha_vigencia], map: "idx_alumnos_fecha_vigencia")
+  @@index([matricula], map: "idx_alumnos_matricula")
+  @@index([nombre, apellido_paterno], map: "idx_alumnos_nombre")
+  @@index([plan_id], map: "idx_alumnos_plan")
+  @@index([telefono], map: "idx_alumnos_telefono")
+}
+
+model auditoria {
+  id                 Int              @id @default(autoincrement())
+  tabla              String           @db.VarChar(50)
+  registro_id        Int
+  accion             auditoria_accion
+  datos_anteriores   String?          @db.LongText
+  datos_nuevos       String?          @db.LongText
+  campos_modificados String?          @db.LongText
+  usuario_id         Int?
+  ip_address         String?          @db.VarChar(45)
+  user_agent         String?          @db.Text
+  fecha_accion       DateTime?        @default(now()) @db.Timestamp(0)
+  usuarios           usuarios?        @relation(fields: [usuario_id], references: [id], onUpdate: Restrict, map: "auditoria_ibfk_1")
+
+  @@index([accion], map: "idx_auditoria_accion")
+  @@index([fecha_accion], map: "idx_auditoria_fecha")
+  @@index([tabla, registro_id], map: "idx_auditoria_registro")
+  @@index([tabla], map: "idx_auditoria_tabla")
+  @@index([usuario_id], map: "idx_auditoria_usuario")
+}
+
+model configuracion {
+  id                  Int                 @id @default(autoincrement())
+  clave               String              @unique(map: "clave") @db.VarChar(100)
+  valor               String              @db.Text
+  descripcion         String?             @db.VarChar(500)
+  tipo                configuracion_tipo? @default(string)
+  categoria           String?             @default("general") @db.VarChar(50)
+  editable            Boolean?            @default(true)
+  fecha_creacion      DateTime?           @default(now()) @db.Timestamp(0)
+  fecha_actualizacion DateTime?           @default(now()) @db.Timestamp(0)
+
+  @@index([categoria], map: "idx_configuracion_categoria")
+  @@index([clave], map: "idx_configuracion_clave")
+}
+
+model mensualidades {
+  id                  Int                    @id @default(autoincrement())
+  alumno_id           Int
+  numero_mensualidad  Int
+  fecha_vencimiento   DateTime               @db.Date
+  monto               Decimal                @db.Decimal(10, 2)
+  estatus             mensualidades_estatus? @default(pendiente)
+  fecha_pago          DateTime?              @db.DateTime(0)
+  observaciones       String?                @db.Text
+  fecha_creacion      DateTime?              @default(now()) @db.Timestamp(0)
+  fecha_actualizacion DateTime?              @default(now()) @db.Timestamp(0)
+  alumnos             alumnos                @relation(fields: [alumno_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "mensualidades_ibfk_1")
+  pagos               pagos[]
+
+  @@unique([alumno_id, numero_mensualidad], map: "unique_alumno_mensualidad")
+  @@index([estatus], map: "idx_mensualidades_estatus")
+  @@index([fecha_vencimiento], map: "idx_mensualidades_fecha_vencimiento")
+  @@index([alumno_id, estatus], map: "idx_mensualidades_alumno_estatus")
+  @@index([fecha_vencimiento, estatus], map: "idx_mensualidades_vencidas")
+}
+
+model notificaciones {
+  id                  Int                    @id @default(autoincrement())
+  alumno_id           Int
+  tipo                notificaciones_tipo
+  titulo              String                 @db.VarChar(200)
+  mensaje             String                 @db.Text
+  datos_adicionales   String?                @db.LongText
+  enviado             Boolean?               @default(false)
+  fecha_envio         DateTime?              @db.DateTime(0)
+  metodo              notificaciones_metodo? @default(email)
+  destinatario        String?                @db.VarChar(100)
+  intentos_envio      Int?                   @default(0)
+  ultimo_error        String?                @db.Text
+  fecha_programada    DateTime?              @db.DateTime(0)
+  fecha_creacion      DateTime?              @default(now()) @db.Timestamp(0)
+  fecha_actualizacion DateTime?              @default(now()) @db.Timestamp(0)
+  alumnos             alumnos                @relation(fields: [alumno_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "notificaciones_ibfk_1")
+
+  @@index([enviado], map: "idx_notificaciones_enviado")
+  @@index([alumno_id], map: "idx_notificaciones_alumno")
+  @@index([fecha_programada], map: "idx_notificaciones_fecha_programada")
+  @@index([tipo], map: "idx_notificaciones_tipo")
+}
+
+model pagos {
+  id                  Int              @id @default(autoincrement())
+  numero_recibo       String           @unique(map: "numero_recibo") @db.VarChar(20)
+  alumno_id           Int
+  mensualidad_id      Int?
+  tipo_pago           pagos_tipo_pago
+  concepto            String           @db.VarChar(200)
+  monto               Decimal          @db.Decimal(10, 2)
+  descuento           Decimal?         @default(0.00) @db.Decimal(10, 2)
+  moratorio           Decimal?         @default(0.00) @db.Decimal(10, 2)
+  total               Decimal          @db.Decimal(10, 2)
+  forma_pago          pagos_forma_pago
+  referencia          String?          @db.VarChar(100)
+  banco               String?          @db.VarChar(50)
+  fecha_pago          DateTime         @db.DateTime(0)
+  fecha_vencimiento   DateTime?        @db.Date
+  dias_retraso        Int?             @default(0)
+  usuario_id          Int
+  observaciones       String?          @db.Text
+  comprobante_url     String?          @db.VarChar(500)
+  estatus             pagos_estatus?   @default(activo)
+  fecha_cancelacion   DateTime?        @db.DateTime(0)
+  motivo_cancelacion  String?          @db.Text
+  fecha_creacion      DateTime?        @default(now()) @db.Timestamp(0)
+  fecha_actualizacion DateTime?        @default(now()) @db.Timestamp(0)
+  alumnos             alumnos          @relation(fields: [alumno_id], references: [id], onUpdate: Restrict, map: "pagos_ibfk_1")
+  mensualidades       mensualidades?   @relation(fields: [mensualidad_id], references: [id], onUpdate: Restrict, map: "pagos_ibfk_2")
+  usuarios            usuarios         @relation(fields: [usuario_id], references: [id], onUpdate: Restrict, map: "pagos_ibfk_3")
+
+  @@index([alumno_id, fecha_pago], map: "idx_pagos_alumno_fecha")
+  @@index([fecha_pago], map: "idx_pagos_fecha_pago")
+  @@index([mensualidad_id], map: "mensualidad_id")
+  @@index([estatus], map: "idx_pagos_estatus")
+  @@index([forma_pago], map: "idx_pagos_forma")
+  @@index([numero_recibo], map: "idx_pagos_numero_recibo")
+  @@index([fecha_pago], map: "idx_pagos_periodo")
+  @@index([tipo_pago], map: "idx_pagos_tipo")
+  @@index([usuario_id], map: "idx_pagos_usuario")
+}
+
+model planes {
+  id                   Int       @id @default(autoincrement())
+  nombre               String    @db.VarChar(50)
+  descripcion          String?   @db.Text
+  numero_mensualidades Int
+  precio_mensualidad   Decimal   @db.Decimal(10, 2)
+  precio_inscripcion   Decimal   @db.Decimal(10, 2)
+  vigencia_meses       Int?      @default(12)
+  extension_meses      Int?      @default(4)
+  activo               Boolean?  @default(true)
+  fecha_creacion       DateTime? @default(now()) @db.Timestamp(0)
+  fecha_actualizacion  DateTime? @default(now()) @db.Timestamp(0)
+  alumnos              alumnos[]
+
+  @@index([activo], map: "idx_planes_activo")
+  @@index([nombre], map: "idx_planes_nombre")
+}
+
+model usuarios {
+  id                  Int           @id @default(autoincrement())
+  nombre              String        @db.VarChar(100)
+  email               String        @unique(map: "email") @db.VarChar(100)
+  password_hash       String        @db.VarChar(255)
+  rol                 usuarios_rol? @default(cajero)
+  activo              Boolean?      @default(true)
+  ultimo_acceso       DateTime?     @db.Timestamp(0)
+  fecha_creacion      DateTime?     @default(now()) @db.Timestamp(0)
+  fecha_actualizacion DateTime?     @default(now()) @db.Timestamp(0)
+  auditoria           auditoria[]
+  pagos               pagos[]
+  respaldos           respaldos[]
+  sesiones            sesiones[]
+
+  @@index([activo], map: "idx_usuarios_activo")
+  @@index([email], map: "idx_usuarios_email")
+  @@index([rol], map: "idx_usuarios_rol")
+}
+
+model respaldos {
+  id               Int               @id @default(autoincrement())
+  nombre_archivo   String            @db.VarChar(200)
+  tipo             respaldos_tipo
+  tama_o_bytes     BigInt?           @map("tamaño_bytes")
+  url_storage      String?           @db.VarChar(500)
+  hash_archivo     String?           @db.VarChar(64)
+  usuario_id       Int?
+  estado           respaldos_estado? @default(en_proceso)
+  mensaje_error    String?           @db.Text
+  fecha_inicio     DateTime?         @default(now()) @db.Timestamp(0)
+  fecha_completado DateTime?         @db.Timestamp(0)
+  usuarios         usuarios?         @relation(fields: [usuario_id], references: [id], onUpdate: Restrict, map: "respaldos_ibfk_1")
+
+  @@index([estado], map: "idx_respaldos_estado")
+  @@index([fecha_inicio], map: "idx_respaldos_fecha")
+  @@index([tipo], map: "idx_respaldos_tipo")
+  @@index([usuario_id], map: "usuario_id")
+}
+
+model sesiones {
+  id                  String    @id @db.VarChar(128)
+  usuario_id          Int
+  ip_address          String?   @db.VarChar(45)
+  user_agent          String?   @db.Text
+  datos_sesion        String?   @db.LongText
+  activa              Boolean?  @default(true)
+  fecha_inicio        DateTime? @default(now()) @db.Timestamp(0)
+  fecha_ultimo_acceso DateTime? @default(now()) @db.Timestamp(0)
+  fecha_expiracion    DateTime  @db.Timestamp(0)
+  usuarios            usuarios  @relation(fields: [usuario_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "sesiones_ibfk_1")
+
+  @@index([activa], map: "idx_sesiones_activa")
+  @@index([fecha_expiracion], map: "idx_sesiones_expiracion")
+  @@index([usuario_id], map: "idx_sesiones_usuario")
+}
+
+enum auditoria_accion {
+  INSERT
+  UPDATE
+  DELETE
+}
+
+enum usuarios_rol {
+  admin
+  coordinador
+  cajero
+}
+
+enum mensualidades_estatus {
+  pendiente
+  pagado
+  vencido
+  cancelado
+}
+
+enum alumnos_estatus {
+  activo
+  graduado
+  baja
+  suspendido
+}
+
+enum pagos_estatus {
+  activo
+  cancelado
+}
+
+enum notificaciones_tipo {
+  pago_vencido
+  pago_proximo
+  graduacion
+  suspension
+  bienvenida
+  recordatorio
+}
+
+enum respaldos_tipo {
+  manual
+  automatico
+  programado
+}
+
+enum configuracion_tipo {
+  string
+  number
+  boolean
+  json
+  date
+}
+
+enum pagos_tipo_pago {
+  mensualidad
+  inscripcion
+  moratorio
+  extension
+  otro
+}
+
+enum alumnos_genero {
+  M
+  F
+  Otro
+}
+
+enum respaldos_estado {
+  en_proceso
+  completado
+  error
+}
+
+enum notificaciones_metodo {
+  email
+  sms
+  whatsapp
+  push
+}
+
+enum pagos_forma_pago {
+  efectivo
+  transferencia
+  tarjeta_debito
+  tarjeta_credito
+  cheque
+}
