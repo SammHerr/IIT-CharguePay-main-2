@@ -1,8 +1,13 @@
 import { NextRequest } from 'next/server'
-import { DatabaseService } from '@/lib/database'
-import { pagoSchema, pagoFiltersSchema } from '@/lib/validations'
-import { handleApiError, validateRequestBody, getQueryParams, createSuccessResponse, generateReceiptNumber } from '@/lib/api-utils'
-import { PagoFilters } from '@/lib/types'
+//import { DatabaseService } from '@/lib/database'
+//import { pagoSchema, pagoFiltersSchema } from '@/lib/validations'
+//import { handleApiError, validateRequestBody, getQueryParams, createSuccessResponse, generateReceiptNumber } from '@/lib/api-utils'
+//import { PagoFilters } from '@/lib/types'
+
+import { DatabaseService } from '../../../lib/database'
+import { pagoSchema, pagoFiltersSchema } from '../../../lib/validations'
+import { handleApiError, validateRequestBody, getQueryParams, createSuccessResponse, generateReceiptNumber } from '../../../lib/api-utils'
+import { PagoFilters } from '../../../lib/types'
 
 // GET /api/pagos - Obtener lista de pagos con filtros
 export async function GET(request: NextRequest) {

@@ -169,8 +169,8 @@ export default router
 import express, { Router, type Request, type Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { DatabaseService } from '../config/database'
-import { loginSchema, registerSchema } from '../validations/schemas'
+import { DatabaseService } from '@/core/db'
+import { loginSchema, registerSchema } from '@/validations/schemas'
 
 const router: Router = express.Router()
 
@@ -197,7 +197,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     // Buscar usuario (tomamos password_hash con alias para no cambiar tu lógica)
     const user = await DatabaseService.queryOne<DbUser>(
       `SELECT id, nombre, email, rol, activo, password_hash AS password
-         FROM usuarios
+        FROM usuarios
         WHERE email = ?
         LIMIT 1`,
       [email]

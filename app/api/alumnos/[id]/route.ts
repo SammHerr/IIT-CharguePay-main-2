@@ -1,7 +1,13 @@
-import { NextRequest } from 'next/server'
-import { DatabaseService } from '@/lib/database'
-import { alumnoUpdateSchema } from '@/lib/validations'
-import { handleApiError, validateRequestBody, createSuccessResponse } from '@/lib/api-utils'
+import { NextRequest, NextResponse } from 'next/server'
+//import { DatabaseService } from '@/lib/database'
+//import { alumnoUpdateSchema } from '@/lib/validations'
+//import { handleApiError, validateRequestBody, createSuccessResponse } from '@/lib/api-utils'
+
+//Cambio a rutas relativas debido a error de importación
+import { DatabaseService } from '../../../../lib/database'
+import { handleApiError, createSuccessResponse } from '../../../../lib/api-utils'
+import { alumnoUpdateSchema } from '../../../../lib/validations'
+import { validateRequestBody } from '../../../../lib/api-utils'
 
 // GET /api/alumnos/[id] - Obtener alumno por ID
 export async function GET(

@@ -1,7 +1,12 @@
 import { NextRequest } from 'next/server'
-import { DatabaseService } from '@/lib/database'
-import { planSchema } from '@/lib/validations'
-import { handleApiError, validateRequestBody, createSuccessResponse } from '@/lib/api-utils'
+//import { DatabaseService } from '@/lib/database'
+//import { planSchema } from '@/lib/validations'
+//import { handleApiError, validateRequestBody, createSuccessResponse } from '@/lib/api-utils'
+
+//Cambio a rutas relativas debido a error de importación
+import { DatabaseService } from '../../../lib/database'
+import { planSchema } from '../../../lib/validations'
+import { handleApiError, validateRequestBody, createSuccessResponse } from '../../../lib/api-utils'
 
 // GET /api/planes - Obtener todos los planes
 export async function GET(request: NextRequest) {

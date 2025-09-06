@@ -1,6 +1,10 @@
-import { NextRequest } from 'next/server'
-import { DatabaseService } from '@/lib/database'
-import { handleApiError, createSuccessResponse, calculateMoratorio } from '@/lib/api-utils'
+import { NextRequest, NextResponse } from 'next/server'
+//import { DatabaseService } from '@/lib/database'
+//import { handleApiError, createSuccessResponse, calculateMoratorio } from '@/lib/api-utils'
+
+//Cambio a rutas relativas debido a error de importación
+import { DatabaseService } from '../../../../../lib/database'
+import { handleApiError, createSuccessResponse, calculateMoratorio } from '../../../../../lib/api-utils'
 
 // GET /api/alumnos/[id]/mensualidades - Obtener mensualidades de un alumno
 export async function GET(

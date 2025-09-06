@@ -1,7 +1,12 @@
 import { NextRequest } from 'next/server'
-import { DatabaseService } from '@/lib/database'
-import { reporteFiltersSchema } from '@/lib/validations'
-import { handleApiError, getQueryParams, createSuccessResponse } from '@/lib/api-utils'
+//import { DatabaseService } from '@/lib/database'
+//import { reporteFiltersSchema } from '@/lib/validations'
+//import { handleApiError, getQueryParams, createSuccessResponse } from '@/lib/api-utils'
+
+//Cambio a rutas relativas debido a error de importación
+import { DatabaseService } from '../../../lib/database'
+import { reporteFiltersSchema } from '../../../lib/validations'
+import { handleApiError, getQueryParams, createSuccessResponse } from '../../../lib/api-utils'
 
 // GET /api/reportes - Obtener reportes según filtros
 export async function GET(request: NextRequest) {

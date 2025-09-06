@@ -1,5 +1,5 @@
 //import { Router } from 'express'
-import { DatabaseService } from '../config/database'
+import { DatabaseService } from '../core/db'
 
 //const router = Router()
 import express, { Router } from 'express'

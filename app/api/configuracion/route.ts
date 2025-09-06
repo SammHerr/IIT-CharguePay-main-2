@@ -1,7 +1,11 @@
-import { NextRequest } from 'next/server'
-import { DatabaseService } from '@/lib/database'
-import { configuracionSchema } from '@/lib/validations'
-import { handleApiError, validateRequestBody, createSuccessResponse } from '@/lib/api-utils'
+import { NextRequest, NextResponse } from 'next/server'
+//import { DatabaseService } from '@/lib/database'
+//import { configuracionSchema } from '@/lib/validations'
+//import { handleApiError, validateRequestBody, createSuccessResponse } from '@/lib/api-utils'
+
+//Cambio a rutas relativas debido a error de importación
+import { DatabaseService } from '../../../lib/database'
+import { handleApiError, createSuccessResponse } from '../../../lib/api-utils'
 
 // GET /api/configuracion - Obtener configuraciones
 export async function GET(request: NextRequest) {

@@ -157,6 +157,7 @@ app.listen(PORT, () => {
   console.log(`🚀 Servidor API ejecutándose en puerto ${PORT}`)
   console.log(`📊 Health: http://localhost:${PORT}/health`)
   console.log(`🌍 Entorno: ${NODE_ENV}`)
+  
 })
 
 export default app

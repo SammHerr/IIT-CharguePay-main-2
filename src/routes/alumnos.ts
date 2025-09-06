@@ -329,6 +329,8 @@ export default router
 
 */
 
+
+
 import express, { Router, type Request, type Response } from 'express'
 import { DatabaseService } from '../config/database'
 import { alumnoSchema, alumnoUpdateSchema, alumnoFiltersSchema } from '../validations/schemas'
@@ -352,7 +354,7 @@ function getParamId(req: Request, res: Response): number | null {
 router.use(authenticateToken)
 
 // GET /api/alumnos - Obtener lista de alumnos
-router.get('/', async (req: Request, res: Response): Promise<void> => {
+/*router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const filters = alumnoFiltersSchema.parse(req.query) as AlumnoFilters
 
@@ -404,12 +406,18 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 
     const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM')
     const countRow = await DatabaseService.queryOne<{ total: number }>(countQuery, params)
-    const total = Number(countRow?.total ?? 0)
+    const total = Number(countRow?.total ?? 0)*/
 
     // Ordenamiento
-    const sortBy = filters.sortBy || 'fecha_creacion'
+    /*const sortBy = filters.sortBy || 'fecha_creacion'
     const sortOrder = (filters.sortOrder || 'desc').toUpperCase()
-    query += ` ORDER BY a.${sortBy} ${sortOrder}`
+    query += ` ORDER BY a.${sortBy} ${sortOrder}`*/
+    /*const allowedSort = new Set([
+    'id','nombre','matricula','fecha_inscripcion','fecha_inicio','fecha_vigencia','estatus','plan_id'
+    ])
+    const sortBy = (filters.sortBy && allowedSort.has(filters.sortBy)) ? filters.sortBy : 'id'
+    const sortOrder = (filters.sortOrder?.toLowerCase() === 'asc' ? 'asc' : 'desc')
+                        query += ` ORDER BY a.${sortBy} ${sortOrder.toUpperCase()}`
 
     // Paginación
     const page = filters.page || 1
@@ -436,10 +444,115 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     // delega al middleware de errores global
     res.status(500).json({ success: false, error: 'Error listando alumnos' })
   }
+})*/
+
+// GET /api/alumnos - Obtener lista de alumnos
+router.get('/', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // ✅ Manejo de validación segura
+    let filters: AlumnoFilters
+    try {
+      filters = alumnoFiltersSchema.parse(req.query) as AlumnoFilters
+    } catch (validationError) {
+      res.status(400).json({
+        success: false,
+        error: 'Parámetros inválidos',
+        details: (validationError as Error).message
+      })
+      return
+    }
+
+    let query = `
+      SELECT 
+        a.*,
+        p.nombre as plan_nombre,
+        (SELECT COUNT(*) FROM mensualidades m WHERE m.alumno_id = a.id AND m.estatus = 'pagado') as mensualidades_pagadas,
+        (SELECT COUNT(*) FROM mensualidades m WHERE m.alumno_id = a.id AND m.estatus = 'pendiente') as mensualidades_pendientes,
+        (SELECT COUNT(*) FROM mensualidades m WHERE m.alumno_id = a.id AND m.estatus = 'vencido') as mensualidades_vencidas,
+        (SELECT SUM(pg.total) FROM pagos pg WHERE pg.alumno_id = a.id AND pg.estatus = 'activo') as total_pagado,
+        (SELECT SUM(m.monto) FROM mensualidades m WHERE m.alumno_id = a.id AND m.estatus IN ('pendiente', 'vencido')) as saldo_pendiente
+      FROM alumnos a
+      JOIN planes p ON a.plan_id = p.id
+      WHERE 1=1
+    `
+
+    const params: any[] = []
+
+    if (filters.search) {
+      query += ` AND (a.nombre LIKE ? OR a.apellido_paterno LIKE ? OR a.matricula LIKE ? OR a.email LIKE ?)`
+      const searchTerm = `%${filters.search}%`
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm)
+    }
+
+    if (filters.estatus) {
+      query += ` AND a.estatus = ?`
+      params.push(filters.estatus)
+    }
+
+    if (filters.plan_id) {
+      query += ` AND a.plan_id = ?`
+      params.push(filters.plan_id)
+    }
+
+    if (filters.fecha_inicio_desde) {
+      query += ` AND a.fecha_inicio >= ?`
+      params.push(filters.fecha_inicio_desde)
+    }
+
+    if (filters.fecha_inicio_hasta) {
+      query += ` AND a.fecha_inicio <= ?`
+      params.push(filters.fecha_inicio_hasta)
+    }
+
+    // ✅ Contar total con query independiente (evita replace raro)
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM alumnos a
+      JOIN planes p ON a.plan_id = p.id
+      WHERE 1=1
+    `
+    const countRow = await DatabaseService.queryOne<{ total: number }>(countQuery, params)
+    const total = Number(countRow?.total ?? 0)
+
+    // ✅ Ordenamiento seguro
+    const allowedSort = new Set([
+      'id', 'nombre', 'matricula', 'fecha_inscripcion', 'fecha_inicio',
+      'fecha_vigencia', 'estatus', 'plan_id'
+    ])
+    const sortBy = (filters.sortBy && allowedSort.has(filters.sortBy)) ? filters.sortBy : 'id'
+    const sortOrder = (filters.sortOrder?.toLowerCase() === 'asc' ? 'asc' : 'desc')
+    query += ` ORDER BY a.${sortBy} ${sortOrder.toUpperCase()}`
+
+    // ✅ Paginación
+    const page = filters.page || 1
+    const limit = filters.limit || 10
+    const offset = (page - 1) * limit
+    query += ` LIMIT ? OFFSET ?`
+    params.push(limit, offset)
+
+    const alumnos = await DatabaseService.query<any>(query, params)
+
+    const response: ApiResponse = {
+      success: true,
+      data: alumnos,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    }
+
+    res.json(response)
+  } catch (error) {
+    console.error("❌ Error listando alumnos:", error)
+    res.status(500).json({ success: false, error: 'Error listando alumnos' })
+  }
 })
 
+
 // POST /api/alumnos - Crear nuevo alumno
-router.post('/', requireRole(['admin', 'coordinador']), async (req: Request, res: Response): Promise<void> => {
+/*router.post('/', requireRole(['admin', 'coordinador']), async (req: Request, res: Response): Promise<void> => {
   try {
     const data = alumnoSchema.parse(req.body)
 
@@ -489,7 +602,40 @@ router.post('/', requireRole(['admin', 'coordinador']), async (req: Request, res
       data.motivo_baja, data.notas, data.foto_url,
       data.documentos_url ? JSON.stringify(data.documentos_url) : null
     ]
+*/
+    // util local, no cambia lógica
+/*const toNull = <T>(v: T | undefined | null | '') => (v === undefined || v === '' ? null : v)
 
+const insertParams = [
+  data.matricula,                      // REQ
+  data.nombre,                         // REQ
+  data.apellido_paterno,               // REQ
+  toNull(data.apellido_materno),       // OPT -> null
+  toNull(data.fecha_nacimiento),       // OPT -> null
+  toNull(data.genero),                 // OPT -> null
+  toNull(data.telefono),               // OPT -> null
+  toNull(data.email),                  // OPT -> null
+  toNull(data.direccion),              // OPT -> null
+  toNull(data.ciudad),                 // OPT -> null
+  toNull(data.estado),                 // OPT -> null
+  toNull(data.codigo_postal),          // OPT -> null
+  toNull(data.contacto_emergencia),    // OPT -> null
+  toNull(data.telefono_emergencia),    // OPT -> null
+  toNull(data.relacion_emergencia),    // OPT -> null
+  data.fecha_inscripcion,              // REQ
+  data.fecha_inicio,                   // REQ
+  data.plan_id,                        // REQ (FK)
+  fechaVigencia.toISOString().split('T')[0], // calculado
+  data.estatus ?? 'activo',            // por si no llega
+  toNull(data.motivo_baja),            // OPT -> null
+  toNull(data.notas),                  // OPT -> null
+  toNull(data.foto_url),               // OPT -> null
+  data.documentos_url && data.documentos_url.length
+    ? JSON.stringify(data.documentos_url)
+    : null
+]*/
+
+/*
     const alumnoId = await DatabaseService.insert(insertQuery, insertParams)
 
     const nuevoAlumno = await DatabaseService.queryOne<any>(`
@@ -509,7 +655,125 @@ router.post('/', requireRole(['admin', 'coordinador']), async (req: Request, res
   } catch (error) {
     res.status(500).json({ success: false, error: 'Error creando alumno' })
   }
+})*/
+
+// POST /api/alumnos - Crear nuevo alumno 
+router.post('/', requireRole(['admin', 'coordinador']), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const data = alumnoSchema.parse(req.body)
+
+    // Generar matrícula si no se proporciona
+    if (!data.matricula) {
+      const year = new Date().getFullYear()
+      const count = await DatabaseService.queryOne<{ total: number }>(
+        'SELECT COUNT(*) as total FROM alumnos WHERE YEAR(fecha_creacion) = ?',
+        [year]
+      )
+      const consecutivo = String((count?.total ?? 0) + 1).padStart(3, '0')
+      data.matricula = `IIT-${year}-${consecutivo}`
+    }
+
+    // 🔧 Validar si ya existe la matrícula
+    const existeMatricula = await DatabaseService.queryOne<{ total: number }>(
+      'SELECT COUNT(*) as total FROM alumnos WHERE matricula = ?',
+      [data.matricula]
+    )
+    if ((existeMatricula?.total ?? 0) > 0) {
+      res.status(400).json({ success: false, error: 'La matrícula ya existe' })
+      return
+    }
+
+    // Cargar datos del plan
+    const plan = await DatabaseService.queryOne<{
+      vigencia_meses: number
+      numero_mensualidades: number
+      precio_mensualidad: number
+    }>(
+      'SELECT vigencia_meses, numero_mensualidades, precio_mensualidad FROM planes WHERE id = ?',
+      [data.plan_id]
+    )
+
+    if (!plan) {
+      res.status(404).json({ success: false, error: 'Plan no encontrado' })
+      return
+    }
+
+    const fechaInicio = new Date(data.fecha_inicio)
+    const fechaVigencia = new Date(fechaInicio)
+    fechaVigencia.setMonth(fechaVigencia.getMonth() + plan.vigencia_meses)
+
+    const insertQuery = `
+      INSERT INTO alumnos (
+        matricula, nombre, apellido_paterno, apellido_materno, fecha_nacimiento,
+        genero, telefono, email, direccion, ciudad, estado, codigo_postal,
+        contacto_emergencia, telefono_emergencia, relacion_emergencia,
+        fecha_inscripcion, fecha_inicio, plan_id, fecha_vigencia, estatus,
+        motivo_baja, notas, foto_url, documentos_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+
+    const insertParams = [
+      data.matricula, data.nombre, data.apellido_paterno, data.apellido_materno,
+      data.fecha_nacimiento, data.genero, data.telefono, data.email,
+      data.direccion, data.ciudad, data.estado, data.codigo_postal,
+      data.contacto_emergencia, data.telefono_emergencia, data.relacion_emergencia,
+      data.fecha_inscripcion, data.fecha_inicio, data.plan_id,
+      fechaVigencia.toISOString().split('T')[0], data.estatus,
+      data.motivo_baja, data.notas, data.foto_url,
+      data.documentos_url ? JSON.stringify(data.documentos_url) : null
+    ]
+
+    // Asegurar que tomamos el insertId correctamente
+    const result = await DatabaseService.insert(insertQuery, insertParams)
+    const alumnoId = (result as any).insertId ?? result
+
+    // --------- generar calendario de mensualidades ----------
+    const existeMensualidad = await DatabaseService.queryOne<{ total: number }>(
+      'SELECT COUNT(*) as total FROM mensualidades WHERE alumno_id = ?',
+      [alumnoId]
+    )
+
+    if ((existeMensualidad?.total ?? 0) === 0) {
+      const diaInicio = fechaInicio.getDate()
+
+      for (let i = 1; i <= plan.numero_mensualidades; i++) {
+        const venc = new Date(fechaInicio)
+        venc.setMonth(venc.getMonth() + (i - 1))
+        venc.setDate(diaInicio)
+
+        const fechaVenc = venc.toISOString().split('T')[0]
+
+        await DatabaseService.insert(
+          `INSERT INTO mensualidades
+            (alumno_id, numero_mensualidad, monto, fecha_vencimiento, estatus)
+            VALUES (?, ?, ?, ?, ?)`,
+          [alumnoId, i, plan.precio_mensualidad, fechaVenc, 'pendiente']
+        )
+      }
+    }
+    // --------------------------------------------------------
+
+    const nuevoAlumno = await DatabaseService.queryOne<any>(`
+      SELECT 
+        a.*,
+        p.nombre as plan_nombre
+      FROM alumnos a
+      JOIN planes p ON a.plan_id = p.id
+      WHERE a.id = ?
+    `, [alumnoId])
+
+    res.status(201).json({
+      success: true,
+      data: nuevoAlumno,
+      message: 'Alumno creado exitosamente'
+    })
+  } catch (error) {
+    console.error("❌ Error en POST /api/alumnos:", error)
+    res.status(500).json({ success: false, error: 'Error creando alumno' })
+  }
 })
+
+
 
 // GET /api/alumnos/:id - Obtener alumno por ID
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {

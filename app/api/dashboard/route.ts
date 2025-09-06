@@ -1,6 +1,10 @@
 import { NextRequest } from 'next/server'
-import { DatabaseService } from '@/lib/database'
-import { handleApiError, createSuccessResponse } from '@/lib/api-utils'
+//import { DatabaseService } from '@/lib/database'
+//import { handleApiError, createSuccessResponse } from '@/lib/api-utils'
+
+//Cambio a rutas relativas debido a error de importación
+import { DatabaseService } from '../../../lib/database'
+import { handleApiError, createSuccessResponse } from '../../../lib/api-utils'
 
 // GET /api/dashboard - Obtener estadísticas del dashboard
 export async function GET(request: NextRequest) {

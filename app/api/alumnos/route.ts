@@ -1,8 +1,15 @@
-import { NextRequest } from 'next/server'
-import { DatabaseService } from '@/lib/database'
-import { alumnoSchema, alumnoFiltersSchema } from '@/lib/validations'
-import { handleApiError, validateRequestBody, getQueryParams, createSuccessResponse } from '@/lib/api-utils'
-import { Alumno, AlumnoFilters } from '@/lib/types'
+import { NextRequest, NextResponse } from 'next/server'
+
+//import { DatabaseService } from '@/lib/database'
+//import { alumnoSchema, alumnoFiltersSchema } from '@/lib/validations'
+//import { handleApiError, validateRequestBody, getQueryParams, createSuccessResponse } from '@/lib/api-utils'
+//import { Alumno, AlumnoFilters } from '@/lib/types'
+
+//Cambio a rutas relativas debido a error de importación
+import { DatabaseService } from '../../../lib/database'
+import { alumnoSchema, alumnoFiltersSchema } from '../../../lib/validations'
+import { handleApiError, validateRequestBody, getQueryParams, createSuccessResponse } from '../../../lib/api-utils'
+import { Alumno, AlumnoFilters } from '../../../lib/types'
 
 // GET /api/alumnos - Obtener lista de alumnos con filtros y paginación
 export async function GET(request: NextRequest) {
