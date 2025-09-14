@@ -1,6 +1,8 @@
-/*import { Request, Response, NextFunction } from 'express'
+/*
+
+import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
-import { DatabaseService } from '../core/db'
+import { DatabaseService } from '@/core/db'
 
 export interface AuthRequest extends Request {
   user?: {
@@ -10,24 +12,27 @@ export interface AuthRequest extends Request {
   }
 }
 
+const JWT_SECRET = process.env['JWT_SECRET'] ?? 'secret'
+
 export const authenticateToken = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
     const authHeader = req.headers['authorization']
     const token = authHeader && authHeader.split(' ')[1]
 
     if (!token) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: 'Token de acceso requerido'
       })
+      return
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as any
-    
+    const decoded = jwt.verify(token, JWT_SECRET) as any
+
     // Verificar que el usuario existe y está activo
     const user = await DatabaseService.queryOne(
       'SELECT id, email, rol, activo FROM usuarios WHERE id = ?',
@@ -35,10 +40,11 @@ export const authenticateToken = async (
     )
 
     if (!user || !user.activo) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: 'Usuario no válido o inactivo'
       })
+      return
     }
 
     req.user = {
@@ -48,8 +54,8 @@ export const authenticateToken = async (
     }
 
     next()
-  } catch (error) {
-    return res.status(403).json({
+  } catch (_err) {
+    res.status(403).json({
       success: false,
       error: 'Token inválido'
     })
@@ -57,19 +63,115 @@ export const authenticateToken = async (
 }
 
 export const requireRole = (roles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: 'Usuario no autenticado'
       })
+      return
     }
 
     if (!roles.includes(req.user.rol)) {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         error: 'Permisos insuficientes'
       })
+      return
+    }
+
+    next()
+  }
+}
+*/
+
+// Middleware de autenticación y autorización
+/*
+import { Request, Response, NextFunction } from 'express'
+import jwt from 'jsonwebtoken'
+import { DatabaseService } from '@/core/db'
+
+export interface AuthRequest extends Request {
+  user?: {
+    id: number
+    email: string
+    rol: string
+  }
+}
+
+const JWT_SECRET = process.env['JWT_SECRET'] ?? 'secret'
+
+export const authenticateToken = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const authHeader = req.headers['authorization']
+    const bearer = authHeader && authHeader.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : undefined
+
+    // Soporte opcional: leer cookie "token" si está disponible (requiere cookie-parser en el server)
+    const cookieToken = (req as any)?.cookies?.token as string | undefined
+
+    const token = bearer ?? cookieToken
+
+    if (!token) {
+      res.status(401).json({
+        success: false,
+        error: 'Token de acceso requerido'
+      })
+      return
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as any
+
+    // Verificar que el usuario existe y está activo
+    const user = await DatabaseService.queryOne(
+      'SELECT id, email, rol, activo FROM usuarios WHERE id = ?',
+      [decoded.userId]
+    )
+
+    if (!user || !user.activo) {
+      res.status(401).json({
+        success: false,
+        error: 'Usuario no válido o inactivo'
+      })
+      return
+    }
+
+    req.user = {
+      id: user.id,
+      email: user.email,
+      rol: user.rol
+    }
+
+    next()
+  } catch (_err) {
+    res.status(403).json({
+      success: false,
+      error: 'Token inválido'
+    })
+  }
+}
+
+export const requireRole = (roles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: 'Usuario no autenticado'
+      })
+      return
+    }
+
+    if (!roles.includes(req.user.rol)) {
+      res.status(403).json({
+        success: false,
+        error: 'Permisos insuficientes'
+      })
+      return
     }
 
     next()
@@ -97,8 +199,17 @@ export const authenticateToken = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    // 1) Intenta Authorization: Bearer <token>
     const authHeader = req.headers['authorization']
-    const token = authHeader && authHeader.split(' ')[1]
+    let token = authHeader && authHeader.split(' ')[1]
+
+    // 2) Fallback: cookie "token" (requiere cookie-parser)
+    if (!token) {
+      const cookieToken = (req as any)?.cookies?.token
+      if (typeof cookieToken === 'string' && cookieToken.length > 0) {
+        token = cookieToken
+      }
+    }
 
     if (!token) {
       res.status(401).json({
