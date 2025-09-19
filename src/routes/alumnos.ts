@@ -274,7 +274,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ success: false, error: 'Error obteniendo alumno' })
   }
 })
-
+/*
 // PUT /api/alumnos/:id - Actualizar alumno
 router.put('/:id', requireRole(['admin', 'coordinador']), async (req: Request, res: Response): Promise<void> => {
   try {
@@ -340,9 +340,127 @@ router.put('/:id', requireRole(['admin', 'coordinador']), async (req: Request, r
   } catch (error) {
     res.status(500).json({ success: false, error: 'Error actualizando alumno' })
   }
+})*/
+
+// PUT /api/alumnos/:id - Actualizar alumno
+router.put('/:id', requireRole(['admin', 'coordinador']), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = getParamId(req, res)
+    if (id === null) return
+
+    // ---------- NORMALIZACIÓN SUAVE ----------
+    const raw: any = { ...req.body }
+
+    // 1) plan_id → number
+    if (raw.plan_id !== undefined && raw.plan_id !== null && raw.plan_id !== '') {
+      const n = Number(raw.plan_id)
+      if (!Number.isNaN(n)) raw.plan_id = n
+      else delete raw.plan_id
+    }
+
+    // 2) fechas → YYYY-MM-DD (si vienen con tiempo)
+    const dateKeys = ['fecha_nacimiento', 'fecha_inscripcion', 'fecha_inicio', 'fecha_vigencia', 'fecha_extension']
+    for (const k of dateKeys) {
+      if (raw[k]) {
+        // soporta "YYYY-MM-DD" o "YYYY-MM-DDTHH:mm:ss"
+        const v = String(raw[k])
+        raw[k] = v.length > 10 ? v.slice(0, 10) : v
+      }
+    }
+
+    // 3) documentos_url: string CSV -> array<string>
+    if (typeof raw.documentos_url === 'string') {
+      const arr = raw.documentos_url
+        .split(',')
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 0)
+      if (arr.length > 0) raw.documentos_url = arr
+      else delete raw.documentos_url
+    }
+    // si llega array pero vacío, lo quitamos
+    if (Array.isArray(raw.documentos_url) && raw.documentos_url.length === 0) {
+      delete raw.documentos_url
+    }
+
+    // 4) Campos opcionales: si llegan "" o null, los quitamos del payload
+    const optionalStringKeys = [
+      'apellido_materno', 'direccion', 'ciudad', 'estado', 'codigo_postal',
+      'contacto_emergencia', 'telefono_emergencia', 'relacion_emergencia',
+      'motivo_baja', 'notas', 'foto_url', 'telefono', 'email', 'matricula'
+    ]
+    for (const k of optionalStringKeys) {
+      if (raw[k] === '' || raw[k] === null) delete raw[k]
+    }
+
+    // 5) genero: solo aceptar 'M' | 'F' | 'Otro'; si viene vacío, no actualizar
+    if (raw.genero === '' || raw.genero === null) delete raw.genero
+
+    // ---------- VALIDACIÓN ----------
+    const data = alumnoUpdateSchema.parse(raw)
+
+    // ---------- EXISTE ALUMNO ----------
+    const existingAlumno = await DatabaseService.queryOne<{ id: number }>(
+      'SELECT id FROM alumnos WHERE id = ?',
+      [id]
+    )
+    if (!existingAlumno) {
+      res.status(404).json({ success: false, error: 'Alumno no encontrado' })
+      return
+    }
+
+    // ---------- CONSTRUIR UPDATE DINÁMICO ----------
+    const updateFields: string[] = []
+    const updateParams: any[] = []
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined) {
+        if (key === 'documentos_url') {
+          updateFields.push(`${key} = ?`)
+          updateParams.push(JSON.stringify(value)) // guardar JSON
+        } else {
+          updateFields.push(`${key} = ?`)
+          updateParams.push(value)
+        }
+      }
+    })
+
+    if (updateFields.length === 0) {
+      res.status(400).json({ success: false, error: 'No hay campos para actualizar' })
+      return
+    }
+
+    updateParams.push(id)
+
+    const updateQuery = `
+      UPDATE alumnos
+      SET ${updateFields.join(', ')}, fecha_actualizacion = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `
+    await DatabaseService.update(updateQuery, updateParams)
+
+    const alumnoActualizado = await DatabaseService.queryOne<any>(`
+      SELECT a.*, p.nombre as plan_nombre
+      FROM alumnos a
+      JOIN planes p ON a.plan_id = p.id
+      WHERE a.id = ?
+    `, [id])
+
+    res.json({
+      success: true,
+      data: alumnoActualizado,
+      message: 'Alumno actualizado exitosamente'
+    })
+  } catch (error: any) {
+    // Log útil para ver si es Zod u otra cosa
+    console.error('❌ Error en PUT /api/alumnos/:id:', error?.issues ?? error)
+    res.status(500).json({ success: false, error: 'Error actualizando alumno' })
+  }
 })
 
+
 // DELETE /api/alumnos/:id - Eliminar alumno (soft delete)
+
+/*
 router.delete('/:id', requireRole(['admin']), async (req: Request, res: Response): Promise<void> => {
   try {
     const id = getParamId(req, res)
@@ -368,6 +486,37 @@ router.delete('/:id', requireRole(['admin']), async (req: Request, res: Response
     res.status(500).json({ success: false, error: 'Error eliminando alumno' })
   }
 })
+  */
+
+router.delete('/:id', requireRole(['admin']), async (req, res) => {
+  try {
+    const id = getParamId(req, res)
+    if (id === null) return
+
+    const existingAlumno = await DatabaseService.queryOne<{ id: number }>(
+      'SELECT id FROM alumnos WHERE id = ?',
+      [id]
+    )
+    if (!existingAlumno) {
+      res.status(404).json({ success: false, error: 'Alumno no encontrado' })
+      return
+    }
+
+    const motivo = (req.body?.motivo_baja ?? 'Eliminado por sistema') as string
+
+    await DatabaseService.update(
+      `UPDATE alumnos 
+       SET estatus = 'baja', motivo_baja = ?, fecha_actualizacion = CURRENT_TIMESTAMP 
+       WHERE id = ?`,
+      [motivo, id]
+    )
+
+    res.json({ success: true, message: 'Alumno dado de baja exitosamente' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Error eliminando alumno' })
+  }
+})
+
 
 export default router
 

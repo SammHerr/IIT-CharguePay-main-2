@@ -103,6 +103,9 @@ import authRoutes from './routes/auth'
 import { errorHandler } from './middleware/errorHandler'
 import { notFound } from './middleware/notFound'
 import { rateLimiter } from './middleware/rateLimiter'
+
+import path from "path";
+import uploadRouter from "./routes/upload";
 // opcional: health DB
 // import { DatabaseService } from './config/database'
 
@@ -128,6 +131,8 @@ app.use(cors({
   origin: FRONTEND_URL,
   credentials: true,
 }))
+
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // Generales
 app.use(morgan('combined'))
@@ -160,6 +165,8 @@ app.use('/api/planes', planesRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/reportes', reportesRoutes)
 app.use('/api/configuracion', configuracionRoutes)
+app.use("/api/upload", uploadRouter);
+
 
 // 404 y errores
 app.use(notFound)
