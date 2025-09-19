@@ -29,6 +29,7 @@ export const alumnoSchema = z.object({
 export const alumnoUpdateSchema = alumnoSchema.partial().omit({ matricula: true })
 
 // Pagos
+/*
 export const pagoSchema = z.object({
   alumno_id: z.number().min(1, 'El alumno es requerido'),
   mensualidad_id: z.number().optional(),
@@ -44,7 +45,88 @@ export const pagoSchema = z.object({
   fecha_vencimiento: z.string().optional(),
   observaciones: z.string().optional(),
   comprobante_url: z.string().optional()
+})*/
+
+// =======================
+// Filtros de pagos
+// =======================
+/*
+const SortDir = z
+  .enum(['asc', 'desc'])
+  .or(z.enum(['ASC', 'DESC']).transform(v => v.toLowerCase() as 'asc' | 'desc'))
+
+export const pagosFiltersSchema = z.object({
+  alumno: z.string().optional(),
+  alumno_id: z.coerce.number().int().positive().optional(),
+  forma_pago: z
+    .enum(['efectivo', 'transferencia', 'tarjeta_debito', 'tarjeta_credito', 'cheque', 'otro'])
+    .optional(),
+  estatus: z.enum(['activo', 'cancelado']).optional(),
+  fecha_ini: z.string().optional(),
+  fecha_fin: z.string().optional(),
+  sortBy: z.enum(['fecha_pago', 'total', 'id', 'alumno']).default('fecha_pago'),
+  sortDir: SortDir.default('desc'), // <<--- acepta ASC/DESC y lo normaliza
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+})*/
+
+
+
+/* =======================
+ * Helpers
+ * ======================= */
+
+// Convierte "" → undefined, y recorta espacios en blanco
+const emptyToUndef = z
+  .string()
+  .transform((v) => (typeof v === 'string' ? v.trim() : v))
+  .transform((v) => (v === '' ? undefined : v));
+
+/* =======================
+ * Pago: create/ajuste
+ * ======================= */
+
+export const pagoSchema = z.object({
+  alumno_id: z.number().min(1, 'El alumno es requerido'),
+  mensualidad_id: z.number().optional(),
+  tipo_pago: z.enum(['mensualidad', 'inscripcion', 'moratorio', 'extension', 'otro', 'ajuste']),
+  concepto: z.string().min(1, 'El concepto es requerido'),
+  monto: z.number().min(0, 'El monto debe ser mayor a 0'),
+  descuento: z.number().min(0).default(0),
+  moratorio: z.number().min(0).default(0),
+  forma_pago: z.enum(['efectivo', 'transferencia', 'tarjeta_debito', 'tarjeta_credito', 'cheque', 'otro']),
+  referencia: emptyToUndef.optional(),
+  banco: emptyToUndef.optional(),
+  fecha_pago: z.string().min(1, 'La fecha de pago es requerida'),
+  fecha_vencimiento: emptyToUndef.optional(),
+  observaciones: emptyToUndef.optional(),
+  comprobante_url: emptyToUndef.optional(),
 })
+
+/* =======================
+ * Pagos: filtros (GET /api/pagos)
+ * ======================= */
+
+// Acepta asc/desc en cualquier mayúscula/minúscula y lo normaliza a minúsculas
+const SortDir = z
+  .enum(['asc', 'desc'])
+  .or(z.enum(['ASC', 'DESC']).transform((v) => v.toLowerCase() as 'asc' | 'desc'));
+
+export const pagosFiltersSchema = z.object({
+  alumno: emptyToUndef.optional(),            // "" → undefined
+  alumno_id: z.coerce.number().int().positive().optional(),
+  forma_pago: z
+    .enum(['efectivo', 'transferencia', 'tarjeta_debito', 'tarjeta_credito', 'cheque', 'otro'])
+    .optional(),
+  estatus: z.enum(['activo', 'cancelado']).optional(),
+  fecha_ini: emptyToUndef.optional(),         // "" → undefined
+  fecha_fin: emptyToUndef.optional(),         // "" → undefined
+  sortBy: z.enum(['fecha_pago', 'total', 'id', 'alumno']).default('fecha_pago'),
+  sortDir: SortDir.default('desc'),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+})
+
 
 // Planes
 export const planSchema = z.object({

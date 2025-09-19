@@ -205,6 +205,7 @@ router.post(
   }
 )
 // ---------------- GET /api/pagos (lista con filtros y paginación) ----------------
+/*
 router.get(
   '/',
   authenticateToken,
@@ -212,6 +213,8 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const filters = pagosFiltersSchema.parse(req.query)
+
+      const sortDirNorm = String(filters.sortDir || 'desc').toLowerCase() as 'asc' | 'desc';
 
       const where: string[] = []
       const params: any[] = []
@@ -318,6 +321,116 @@ router.get(
     }
   }
 )
+
+*/
+
+// ---------------- GET /api/pagos (lista con filtros y paginación) ----------------
+router.get(
+  '/',
+  authenticateToken,
+  requireRole(['admin', 'coordinador']),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      // ✅ Usar SIEMPRE el objeto parseado/normalizado
+      const filters = pagosFiltersSchema.parse(req.query);
+
+      const where: string[] = [];
+      const params: any[] = [];
+
+      if (filters.alumno_id) {
+        where.push('p.alumno_id = ?');
+        params.push(filters.alumno_id);
+      }
+      if (filters.alumno) {
+        where.push('(a.nombre LIKE ? OR a.matricula LIKE ? OR p.numero_recibo LIKE ?)');
+        const like = `%${filters.alumno}%`;
+        params.push(like, like, like);
+      }
+      if (filters.forma_pago) {
+        where.push('p.forma_pago = ?');
+        params.push(filters.forma_pago);
+      }
+      if (filters.estatus) {
+        where.push('p.estatus = ?');
+        params.push(filters.estatus);
+      }
+      if (filters.fecha_ini) {
+        where.push('DATE(p.fecha_pago) >= ?');
+        params.push(filters.fecha_ini);
+      }
+      if (filters.fecha_fin) {
+        where.push('DATE(p.fecha_pago) <= ?');
+        params.push(filters.fecha_fin);
+      }
+
+      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+      const sortMap: Record<string, string> = {
+        fecha_pago: 'p.fecha_pago',
+        total: 'p.total',
+        id: 'p.id',
+        alumno: 'a.nombre',
+      };
+      const orderCol = sortMap[filters.sortBy] ?? 'p.fecha_pago';
+      const orderDir = filters.sortDir.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      const orderSql = `ORDER BY ${orderCol} ${orderDir}, p.id DESC`;
+
+      const page = filters.page;
+      const pageSize = filters.pageSize;
+      const offset = (page - 1) * pageSize;
+
+      const totalRow = await DatabaseService.queryOne<{ total: number }>(
+        `
+        SELECT COUNT(*) AS total
+        FROM pagos p
+        JOIN alumnos a ON a.id = p.alumno_id
+        ${whereSql}
+        `,
+        params
+      );
+      const total = totalRow?.total ?? 0;
+      const totalPages = Math.ceil(total / pageSize);
+
+      const rows = await DatabaseService.query<any>(
+        `
+        SELECT p.*, a.nombre AS alumno_nombre
+        FROM pagos p
+        JOIN alumnos a ON a.id = p.alumno_id
+        ${whereSql}
+        ${orderSql}
+        LIMIT ? OFFSET ?
+        `,
+        [...params, pageSize, offset]
+      );
+
+      const sums = await DatabaseService.queryOne<{
+        suma_total: number; suma_moratorio: number; suma_descuento: number
+      }>(
+        `
+        SELECT
+          COALESCE(SUM(p.total), 0)     AS suma_total,
+          COALESCE(SUM(p.moratorio), 0) AS suma_moratorio,
+          COALESCE(SUM(p.descuento), 0) AS suma_descuento
+        FROM pagos p
+        JOIN alumnos a ON a.id = p.alumno_id
+        ${whereSql}
+        `,
+        params
+      );
+
+      res.json({
+        success: true,
+        data: rows,
+        meta: { page, pageSize, total, totalPages, sums },
+        filters,
+      });
+    } catch (error) {
+      console.error('Error obteniendo pagos:', error);
+      res.status(500).json({ success: false, error: 'Error obteniendo pagos' });
+    }
+  }
+);
+
 
 // ---------------- GET /api/pagos/:id (detalle/recibo) ----------------
 router.get(
