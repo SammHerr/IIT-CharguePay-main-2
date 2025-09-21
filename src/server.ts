@@ -100,6 +100,8 @@ import reportesRoutes from './routes/reportes'
 import configuracionRoutes from './routes/configuracion'
 import authRoutes from './routes/auth'
 
+import cobranzaRouter from './routes/cobranza'
+
 import { errorHandler } from './middleware/errorHandler'
 import { notFound } from './middleware/notFound'
 import { rateLimiter } from './middleware/rateLimiter'
@@ -166,7 +168,7 @@ app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/reportes', reportesRoutes)
 app.use('/api/configuracion', configuracionRoutes)
 app.use("/api/upload", uploadRouter);
-
+app.use('/api/cobranza', cobranzaRouter)
 
 // 404 y errores
 app.use(notFound)

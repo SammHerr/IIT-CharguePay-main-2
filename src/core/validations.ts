@@ -85,7 +85,7 @@ const emptyToUndef = z
 /* =======================
  * Pago: create/ajuste
  * ======================= */
-
+/*
 export const pagoSchema = z.object({
   alumno_id: z.number().min(1, 'El alumno es requerido'),
   mensualidad_id: z.number().optional(),
@@ -101,6 +101,36 @@ export const pagoSchema = z.object({
   fecha_vencimiento: emptyToUndef.optional(),
   observaciones: emptyToUndef.optional(),
   comprobante_url: emptyToUndef.optional(),
+})*/
+
+export const pagoSchema = z.object({
+  alumno_id: z.number().min(1, 'El alumno es requerido'),
+  // puede venir null cuando 'adelantar' es true
+  mensualidad_id: z.number().nullable().optional(),
+  tipo_pago: z.enum(['mensualidad', 'inscripcion', 'moratorio', 'extension', 'otro', 'ajuste']),
+  concepto: z.string().min(1, 'El concepto es requerido'),
+  monto: z.number().min(0, 'El monto debe ser mayor a 0'),
+  descuento: z.number().min(0).default(0),
+  moratorio: z.number().min(0).default(0),
+  forma_pago: z.enum(['efectivo', 'transferencia', 'tarjeta_debito', 'tarjeta_credito', 'cheque']),
+  referencia: z.string().optional(),
+  banco: z.string().optional(),
+  fecha_pago: z.string().min(1, 'La fecha de pago es requerida'),
+  fecha_vencimiento: z.string().optional(),
+  observaciones: z.string().optional(),
+  comprobante_url: z.string().optional(),
+  
+
+  // NUEVO: si no hay mensualidad pendiente, se puede adelantar la siguiente
+  adelantar: z.boolean().optional()
+})
+.refine((data) => {
+  if (data.tipo_pago !== 'mensualidad') return true
+  // si es mensualidad: o trae mensualidad_id, o viene 'adelantar' en true
+  return !!data.mensualidad_id || data.adelantar === true
+}, {
+  path: ['mensualidad_id'],
+  message: 'mensualidad_id es requerido cuando tipo_pago es mensualidad (o marca "adelantar")'
 })
 
 /* =======================
@@ -127,7 +157,7 @@ export const pagosFiltersSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 })
 
-
+/*
 // Planes
 export const planSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
@@ -138,7 +168,76 @@ export const planSchema = z.object({
   vigencia_meses: z.number().min(1).default(12),
   extension_meses: z.number().min(0).default(4),
   activo: z.boolean().default(true)
-})
+})*/
+
+/*
+export const planSchema = z.object({
+  nombre: z.string().min(3),
+  descripcion: z.string().nullable().optional(),
+  numero_mensualidades: z.number().int().min(1),
+  precio_mensualidad: z.union([z.number(), z.string()]).transform(Number),
+  precio_inscripcion: z.union([z.number(), z.string()]).transform(Number),
+  vigencia_meses: z.number().int().min(1).default(12),
+  extension_meses: z.number().int().min(0).default(4),
+  activo: z.boolean().default(true),
+});
+
+export const planUpdateSchema = planSchema.partial();*/
+
+export const planSchema = z.object({
+  nombre: z.string().min(1, "El nombre es requerido"),
+  descripcion: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v === "" ? null : v ?? null)),
+  numero_mensualidades: z.coerce
+    .number()
+    .int()
+    .min(1, "Debe ser al menos 1"),
+  precio_mensualidad: z.coerce
+    .number()
+    .min(0, "Debe ser >= 0"),
+  precio_inscripcion: z.coerce
+    .number()
+    .min(0, "Debe ser >= 0"),
+  vigencia_meses: z.coerce
+    .number()
+    .int()
+    .min(1, "Debe ser al menos 1")
+    .default(12),
+  extension_meses: z.coerce
+    .number()
+    .int()
+    .min(0, "Debe ser >= 0")
+    .default(4),
+  activo: z
+    .union([z.boolean(), z.coerce.number()])
+    .transform((v) => (typeof v === "boolean" ? (v ? 1 : 0) : Number(v ? 1 : 0))),
+});
+
+/**
+ * Update: todos opcionales; misma lógica de coerción y nullables.
+ */
+export const planUpdateSchema = z
+  .object({
+    nombre: z.string().min(1).optional(),
+    descripcion: z
+      .union([z.string(), z.null()])
+      .optional()
+      .transform((v) => (v === "" ? null : v ?? undefined)),
+    numero_mensualidades: z.coerce.number().int().min(1).optional(),
+    precio_mensualidad: z.coerce.number().min(0).optional(),
+    precio_inscripcion: z.coerce.number().min(0).optional(),
+    vigencia_meses: z.coerce.number().int().min(1).optional(),
+    extension_meses: z.coerce.number().int().min(0).optional(),
+    activo: z
+      .union([z.boolean(), z.coerce.number()])
+      .optional()
+      .transform((v) =>
+        v === undefined ? undefined : typeof v === "boolean" ? (v ? 1 : 0) : Number(v ? 1 : 0)
+      ),
+  })
+  .strict();
 
 // Configuración
 export const configuracionSchema = z.object({
@@ -183,3 +282,26 @@ export const reporteFiltersSchema = z.object({
   fecha_desde: z.string().optional(),
   fecha_hasta: z.string().optional()
 })
+
+/*
+export const cobranzaFiltersSchema = z.object({
+  mes: z.coerce.number().int().min(1).max(12).default(new Date().getMonth() + 1),
+  anio: z.coerce.number().int().min(2000).max(2100).default(new Date().getFullYear()),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(20),
+  sortBy: z.enum(['vencimiento', 'alumno', 'monto']).optional().default('vencimiento'),
+  sortDir: z.enum(['asc', 'desc']).optional().default('asc'),
+});
+export type CobranzaFilters = z.infer<typeof cobranzaFiltersSchema>;
+*/
+
+export const cobranzaFiltersSchema = z.object({
+  mes: z.coerce.number().int().min(1).max(12),
+  anio: z.coerce.number().int().min(2000).max(2100),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(20),
+  sortBy: z.enum(['vencimiento', 'alumno', 'monto']).default('vencimiento'),
+  sortDir: z.enum(['asc', 'desc']).default('asc'),
+})
+
+export type CobranzaFilters = z.infer<typeof cobranzaFiltersSchema>

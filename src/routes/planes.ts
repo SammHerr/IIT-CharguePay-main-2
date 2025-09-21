@@ -36,7 +36,7 @@ export default router
 // src/routes/planes.ts
 // src/routes/planes.ts
 import express, { Router } from 'express'
-import { DatabaseService } from '@/config/database'
+import { DatabaseService } from '@/core/db'
 import { planSchema } from '@/core/validations'
 import { authenticateToken, requireRole } from '@/middleware/auth'
 import { Request, Response } from 'express'
